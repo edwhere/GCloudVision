@@ -15,7 +15,7 @@ def get_args():
     # Add arguments
     parser.add_argument('-i', '--image', type=str, help='image file name', required=True)
     parser.add_argument('-m', '--mode', type=str,
-                        help='analysis mode: all, faces, landmark, labels, logos, or text', required=True)
+                        help='analysis mode: all, faces, landmark, labels, logos, text, or web', required=True)
     parser.add_argument('-r', '--results', type=int, help='max number of results (default is 5)', default=5)
 
     # Array for all arguments passed to script
@@ -48,7 +48,8 @@ def request_labels(photo_file, max_results=5):
 
         try:
             label_list = response['responses'][0]['labelAnnotations']
-            labels = map(lambda s: (s['description'], s['score']), label_list)
+            labels = map(lambda s: (s.get('description', 'no_description'),
+                                    s.get('score', 'no_score')), label_list)
             return labels
 
         except KeyError:
@@ -164,7 +165,8 @@ def request_logos(photo_file, max_results=5):
         if logo_list is None:
             return []
         else:
-            logo_features = map(lambda s: (s["description"], s["score"]), logo_list)
+            logo_features = map(lambda s: (s.get("description", "no_description"),
+                                           s.get("score", 'no_score')), logo_list)
             return logo_features
 
 
@@ -194,8 +196,55 @@ def request_landmarks(photo_file, max_results=5):
         if landmark_list is None:
             return []
         else:
-            landmarks = map(lambda s: (s["description"], s["score"]), landmark_list)
+            landmarks = map(lambda s: (s.get("description", 'no_description'),
+                                       s.get("score", 'no_score')), landmark_list)
             return landmarks
+
+
+def request_web_entities(photo_file, max_results=5):
+    """
+    Request the Google service to detect related web entities and web pages
+    :param photo_file: The filename (or path) of the image in a local directory
+    :param max_results: The requested maximum number of results
+    :return: This function returns two lists. The first is a list of web entities. The second is a list of related
+    web pages. Each list is a collection of tuples. For web entities, each tuple includes the entity description,
+    the entity mid, and the entity score. For web pages, each tuple includes the page url and the score.
+    """
+    credentials = GoogleCredentials.get_application_default()
+    service = discovery.build('vision', 'v1', credentials=credentials)
+
+    with open(photo_file, 'rb') as phf:
+        image_content = base64.b64encode(phf.read())
+
+        service_request = service.images().annotate(body={
+            'requests': [{'image': {'content': image_content.decode('UTF-8')},
+                          'features': [{'type': 'WEB_DETECTION', 'maxResults': max_results}]
+                          }]
+        })
+
+        response = service_request.execute()
+
+        web_detection = response['responses'][0].get('webDetection', None)
+
+        if web_detection is None:
+            return [], []
+        else:
+            web_entities = web_detection.get('webEntities', None)
+            web_pages = web_detection.get('pagesWithMatchingImages', None)
+
+            # Add  s.get('entityId', 'no_entityId') in order to see the mid for these entities
+            if web_entities is not None:
+                entities = map(lambda s: (s.get('description', 'no_description'),
+                                          s.get('score', 'no_score')), web_entities)
+            else:
+                entities = []
+
+            if web_pages is not None:
+                pages = map(lambda s: (s.get('url', 'no_url'), s.get('score', 'no_score')), web_pages)
+            else:
+                pages = []
+
+            return entities, pages
 
 
 if __name__ == "__main__":
@@ -236,4 +285,15 @@ if __name__ == "__main__":
         print "\n--------- landmarks ---------------"
         print "Number of landmarks: ", len(results)
         for i, res in enumerate(results):
+            print str(i+1) + ") " + str(res)
+
+    if mode in ['web', 'all']:
+        results = request_web_entities(image, max_results=mxres)
+        print "\n--------- web entities and pages ---------------"
+        print 'Number of web entities: ', len(results[0])
+        for i, res in enumerate(results[0]):
+            print str(i+1) + ") " + str(res)
+
+        print "\nNumber of web pages: ", len(results[1])
+        for i, res in enumerate(results[1]):
             print str(i+1) + ") " + str(res)

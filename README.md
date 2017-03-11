@@ -49,7 +49,9 @@ python gcvImage.py -i myImage.jpg -m logos -r 6             <-  Request to detec
 
 python gcvImage.py -i myImage.jpg -m landmarks -r 6         <-  Request to detect landmarks with a maximum of 6 results
 
-python gcvImage.py -i myImage.jpg -m all -r 6               <-  Request to run all modes (objects, text, faces, logos, landmarks)
+python gcvImage.py -i myImage.jpg -m web -r 6               <-  Request to detect related web entities and web pages with a maximum of 6 results
+
+python gcvImage.py -i myImage.jpg -m all -r 6               <-  Request to run all modes (objects, text, faces, logos, landmarks, web entities)
 
 ## Authors
 
